@@ -121,9 +121,15 @@ function Rotonde(client_url)
 
   this.reset_with_name = async function()
   {
-    this.home.portal.json = {name: name,desc: "new_desc",port:[],feed:[],site:"",dat:""}
+    this.home.portal.json = {name: name,desc: "new_desc",port:[],feed:[],collected:[],site:"",dat:""}
     this.home.save();
     r.home.feed.refresh("reset_with_name");
+  }
+
+  this.update_json = function(json)
+  {
+    // Add missing "collected" array.
+    json.collected = json.collected || [];
   }
 }
 

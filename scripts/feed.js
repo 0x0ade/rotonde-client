@@ -7,22 +7,26 @@ function Feed(feed_urls)
 
   this.tab_timeline_el = document.createElement('t'); this.tab_timeline_el.id = "tab_timeline";
   this.tab_mentions_el = document.createElement('t'); this.tab_mentions_el.id = "tab_mentions";
+  this.tab_collected_el = document.createElement('t'); this.tab_collected_el.id = "tab_collected";
   this.tab_portals_el = document.createElement('t'); this.tab_portals_el.id = "tab_portals";
   this.tab_discovery_el = document.createElement('t'); this.tab_discovery_el.id = "tab_discovery";
   this.tab_services_el = document.createElement('t'); this.tab_services_el.id = "tab_services";
 
   this.tab_portals_el.setAttribute("data-operation","filter:portals");
-  this.tab_mentions_el.setAttribute("data-operation","filter:mentions");
-  this.tab_timeline_el.setAttribute("data-operation","clear_filter");
-  this.tab_discovery_el.setAttribute('data-operation', 'filter:discovery');
   this.tab_portals_el.setAttribute("data-validate","true");
+  this.tab_mentions_el.setAttribute("data-operation","filter:mentions");
   this.tab_mentions_el.setAttribute("data-validate","true");
+  this.tab_collected_el.setAttribute("data-operation","filter:collected");
+  this.tab_collected_el.setAttribute("data-validate","true");
+  this.tab_timeline_el.setAttribute("data-operation","clear_filter");
   this.tab_timeline_el.setAttribute("data-validate","true");
+  this.tab_discovery_el.setAttribute('data-operation', 'filter:discovery');
   this.tab_discovery_el.setAttribute('data-validate', "true");
   
   this.el.appendChild(this.tabs_el);
   this.tabs_el.appendChild(this.tab_timeline_el);
   this.tabs_el.appendChild(this.tab_mentions_el);
+  this.tabs_el.appendChild(this.tab_collected_el);
   this.tabs_el.appendChild(this.tab_portals_el);
   this.tabs_el.appendChild(this.tab_discovery_el);
   this.tabs_el.appendChild(this.tab_services_el);
@@ -166,22 +170,39 @@ function Feed(feed_urls)
     this.page_target = r.home.feed.target;
     this.page_filter = r.home.feed.filter;
 
-    var entries = [];
-    this.mentions = 0;
+    var entries_timeline = [];
 
     for(id in r.home.feed.portals){
       var portal = r.home.feed.portals[id];
-      entries = entries.concat(portal.entries())
+      entries_timeline = entries_timeline.concat(portal.entries())
     }
 
-    this.mentions = entries.filter(function (e) { return e.is_mention }).length
+    this.mentions = entries_timeline.filter(function (e) { return e.is_mention }).length
     if(this.mentions > 0) { console.log("we got mentioned!","×"+this.mentions); }
+
+    var entries_collected = r.home.portal.collected();
+
+    var timeline = r.home.feed.wr_timeline_el;
+
+    var invalidate = function(entries) {
+      for(id in entries){
+        if (entries[id]) entries[id].to_element(timeline, -1, 0, 0);
+      }
+    }
+
+    var entries;
+    // Hide the feed which we're not viewing right now.
+    if (r.home.feed.target == "collected") {
+      entries = entries_collected;
+      invalidate(entries_timeline);
+    } else {
+      entries = entries_timeline;
+      invalidate(entries_collected);
+    }
 
     var sorted_entries = entries.sort(function (a, b) {
       return a.timestamp < b.timestamp ? 1 : -1;
     });
-
-    var timeline = r.home.feed.wr_timeline_el;
     
     var ca = 0;
     var cmin = this.page * this.page_size;
@@ -239,12 +260,14 @@ function Feed(feed_urls)
       }
     }
 
-    r.home.feed.tab_timeline_el.innerHTML = entries.length+" Entries";
+    r.home.feed.tab_timeline_el.innerHTML = entries_timeline.length+" Entries";
     r.home.feed.tab_mentions_el.innerHTML = this.mentions+" Mention"+(this.mentions == 1 ? '' : 's')+"";
+    r.home.feed.tab_collected_el.innerHTML = entries_collected.length+" Collected";
     r.home.feed.tab_portals_el.innerHTML = r.home.feed.portals.length+" Portal"+(r.home.feed.portals.length == 1 ? '' : 's')+"";
     r.home.feed.tab_discovery_el.innerHTML = r.home.discovered_count+"/"+r.home.network.length+" Network"+(r.home.network.length == 1 ? '' : 's')+"";
 
     r.home.feed.tab_mentions_el.className = r.home.feed.target == "mentions" ? "active" : "";
+    r.home.feed.tab_collected_el.className = r.home.feed.target == "collected" ? "active" : "";
     r.home.feed.tab_portals_el.className = r.home.feed.target == "portals" ? "active" : "";
     r.home.feed.tab_discovery_el.className = r.home.feed.target == "discovery" ? "active" : "";
     r.home.feed.tab_timeline_el.className = r.home.feed.target == "" ? "active" : "";

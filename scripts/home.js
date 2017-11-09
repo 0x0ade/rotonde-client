@@ -172,6 +172,12 @@ function Home()
     this.save();
   }
 
+  this.add_collected = function(entry)
+  {
+    this.portal.json.collected.push(entry.to_json());
+    this.save();
+  }
+
   this.save = async function()
   {
     var archive = r.home.portal.archive;

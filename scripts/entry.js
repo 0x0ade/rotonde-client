@@ -2,15 +2,20 @@ function Entry(data,host)
 {
   this.host = host;
 
-  this.message = data.message;
-  this.quote = data.quote;
-  this.ref = data.ref;
-  this.timestamp = data.timestamp;
-  this.id = data.id;
-  this.editstamp = data.editstamp;
-  this.media = data.media;
-  this.target = data.target;
-  this.whisper = data.whisper;
+  this.refresh = function(data)
+  {
+    this.message = data.message;
+    this.quote = data.quote;
+    this.ref = data.ref;
+    this.timestamp = data.timestamp;
+    this.id = data.id;
+    this.editstamp = data.editstamp;
+    this.media = data.media;
+    this.target = data.target;
+    this.whisper = data.whisper;
+    this.author = data.author || this.host;
+  }
+  this.refresh(data);
 
   this.is_seed = this.host ? r.home.portal.json.port.indexOf(this.host.url) > -1 : false;
 
@@ -45,7 +50,17 @@ function Entry(data,host)
 
   this.to_json = function()
   {
-    return {message:this.message,timestamp:this.timestamp,editstamp:this.editstamp,media:this.media,target:this.target,ref:this.ref,quote:this.quote,whisper:this.whisper};
+    return {
+      message: this.message,
+      timestamp: this.timestamp,
+      editstamp: this.editstamp,
+      media: this.media,
+      target: this.target,
+      ref: this.ref,
+      quote: this.quote,
+      whisper: this.whisper,
+      author: this.author == this.host ? undefined : this.author
+    };
   }
 
   this.to_html = function()
@@ -62,14 +77,17 @@ function Entry(data,host)
 
   this.icon = function()
   {
-    return "<a href='"+this.host.url+"'><img class='icon' src='"+this.host.url+"/media/content/icon.svg'></a>";
+    return "<a href='"+this.author.url+"'><img class='icon' src='"+this.author.url+"/media/content/icon.svg'></a>";
   }
 
   this.header = function()
   {
     var html = ""
 
-    html += "<t class='portal'><a href='"+this.host.url+"'>"+this.host.relationship()+r.escape_html(this.host.json.name)+"</a> "+this.rune()+" ";
+    var relationship = (this.host && this.host.relationship()) || r.escape_html(this.author.relationship);
+    var name = this.author.name || this.host.json.name;
+    
+    html += "<t class='portal'><a href='"+this.author.url+"'>"+relationship+r.escape_html(name)+"</a> "+this.rune()+" ";
 
     for(i in this.target){
       if(this.target[i]){
@@ -82,15 +100,15 @@ function Entry(data,host)
       }
     }
 
-    html += "</t><t class='link' data-operation='filter:"+r.escape_attr(this.host.json.name)+"-"+this.id+"'>•</t>";
+    html += "</t><t class='link' data-operation='filter:"+r.escape_attr(name)+"-"+this.id+"'>•</t>";
 
     var operation = '';
-    if(this.host.json.name == r.home.portal.json.name)
+    if(name == r.home.portal.json.name)
       operation = 'edit:'+this.id+' '+this.message.replace(/\'/g,"&apos;");
     else if(this.whisper)
-      operation = "whisper:"+this.host.json.name+" ";
+      operation = "whisper:"+name+" ";
     else
-      operation = "quote:"+this.host.json.name+"-"+this.id+" ";
+      operation = "quote:"+name+"-"+this.id+" ";
 
     var offset = new Date().getTimezoneOffset()*60000;
     var date = new Date(this.timestamp - offset);
@@ -99,7 +117,7 @@ function Entry(data,host)
 
     html += this.editstamp ? "<c class='editstamp' data-operation='"+r.escape_attr(operation)+"' title='"+localtime+"'>edited "+timeSince(this.editstamp)+" ago</c>" : "<c class='timestamp' data-operation='"+operation+"' title='"+localtime+"'>"+timeSince(this.timestamp)+" ago</c>";
 
-    html += this.host.json.name == r.home.portal.json.name && r.is_owner ? "<t class='tools'><t data-operation='delete:"+this.id+"'>del</t></t>" : "";
+    html += name == r.home.portal.json.name && r.is_owner ? "<t class='tools'><t data-operation='delete:"+this.id+"'>del</t></t>" : "";
 
     return html+"<hr />";
   }
@@ -127,7 +145,7 @@ function Entry(data,host)
       videotypes = ["mp4", "webm"]; // "ogg",
       imagetypes = ["apng", "bmp", "dib", "gif", "jpg", "jpeg", "jpe", "png", "svg", "svgz", "tiff", "tif", "webp"];
 
-      var origin = this.quote && this.target ? this.target : this.host.url;
+      var origin = this.quote && this.target ? this.target : this.author.url;
 
       if(audiotypes.indexOf(extension) > -1){ html += "<audio class='media' src='"+origin+"/media/content/"+this.media+"' controls />"; }
       else if(videotypes.indexOf(extension) > -1){ html += "<video class='media' src='"+origin+"/media/content/"+this.media+"' controls />"; }
@@ -248,7 +266,7 @@ function Entry(data,host)
       var mid = m.substring(il + 2, ir);
       var right = m.substring(ir + 2);
 
-      var origin = this.quote && this.target ? this.target : this.host.url;
+      var origin = this.quote && this.target ? this.target : this.author.url;
       var src = origin + '/media/content/inline/' + mid;
 
       if (src.indexOf('.') == -1) {
@@ -269,10 +287,13 @@ function Entry(data,host)
 
   this.is_visible = function(filter = null,feed_target = null)
   {
+    if(feed_target == "collected"){
+      return true; // Collected entries are stored separately.
+    }
     if(feed_target == "mentions"){
       return this.is_mention;
     }
-    if(this.whisper && this.host.json.name != r.home.portal.json.name){
+    if(this.whisper && (this.author.name||this.host.json.name) != r.home.portal.json.name){
       for(url in this.target){
         if(has_hash(r.home.portal.hashes(), url)){
           return false;
@@ -282,7 +303,7 @@ function Entry(data,host)
     if(filter && this.message.indexOf(filter) < 0){
       return false;
     }
-    if(feed_target && feed_target != this.host.json.name){
+    if(feed_target && feed_target != (this.author.name||this.host.json.name)){
       return false;
     }
     return true;

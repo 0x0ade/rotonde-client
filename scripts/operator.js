@@ -246,6 +246,27 @@ function Operator(el)
     r.home.add_entry(new Entry(data));
   }
 
+  this.commands.collect = function(p,option)
+  {
+    var message = p;
+    var name = option.split("-")[0];
+    var ref = parseInt(option.split("-")[1]);
+
+    var portals = r.operator.lookup_name(name);
+
+    if(portals.length === 0 || !portals[0].json.feed[ref]){
+      return;
+    }
+
+    var data = portals[0].json.feed[ref];
+    data.author = {name: portals[0].json.name, url: portals[0].url, relationship: portals[0].relationship()};
+
+    r.home.add_collected(new Entry(data));
+
+    r.home.save();
+    r.home.update();
+  }
+
   this.commands['++'] = function(p, option) {
     r.operator.commands.page('++');
   }

@@ -20,6 +20,7 @@ function Portal(url)
     var file = await this.archive.readFile('/portal.json',{timeout: 2000}).then(console.log("done!"));
 
     this.json = JSON.parse(file);
+    r.update_json(this.json);
     this.maintenance();
   }
 
@@ -51,6 +52,7 @@ function Portal(url)
 
     try {
       p.json = JSON.parse(p.file);
+      r.update_json(p.json);
       r.home.feed.register(p);
     } catch (err) {
       console.log('parsing failed: ', p.url);
@@ -73,6 +75,7 @@ function Portal(url)
     
     try {
       p.json = JSON.parse(p.file);
+      r.update_json(p.json);
     } catch (err) {
       console.log('parsing failed: ', p.url);
       r.home.discover_next();
@@ -98,23 +101,46 @@ function Portal(url)
       }
     }
 
-    p.json = JSON.parse(p.file)
+    try {
+      p.json = JSON.parse(p.file);
+      r.update_json(p.json);
+    } catch (err) {
+      console.log('parsing failed: ', p.url);
+      return;
+    }
   }
 
-  this.entries = function()
+  this.entries = function(feed = p.json.feed)
   {
     var e = [];
-    for (var id in this.json.feed) {
-      var raw = this.json.feed[id];
-      var entry = this.cache_entries[raw.timestamp];
+    if (!feed)
+      return e;
+    
+    for (var id in feed) {
+      var raw = feed[id];
+      var entry = p.cache_entries[raw.timestamp];
       if (entry == null)
-        this.cache_entries[raw.timestamp] = entry = new Entry(this.json.feed[id], p);
+        p.cache_entries[raw.timestamp] = entry = new Entry(raw, p);
+      else
+        entry.refresh(raw);
       entry.id = id;
-      entry.is_mention = entry.detect_mention();
-      e.push(entry);
+      
+      // Don't detect mentions in non-main feeds (f.e. collected).
+      if (feed == p.json.feed)
+        entry.is_mention = entry.detect_mention();
+      
+        e.push(entry);
     }
-    this.last_entry = e[p.json.feed.length - 1];
+
+    if (feed == p.json.feed)
+      p.last_entry = e[p.json.feed.length - 1];
+
     return e;
+  }
+
+  this.collected = function()
+  {
+    return p.entries(p.json.collected);
   }
 
   this.relationship = function(target = r.home.url)
